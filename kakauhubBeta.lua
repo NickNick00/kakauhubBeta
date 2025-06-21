@@ -1,5 +1,12 @@
--- kakauHub UI Compacto + Busca Funcional + Scroll Correto
+-- kakauHub UI + ESP + Comandos pelo Chat
 
+-- Serviços
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local player = Players.LocalPlayer
+
+-- UI
 local ScreenGui = Instance.new("ScreenGui")
 local MainFrame = Instance.new("Frame")
 local TopBar = Instance.new("Frame")
@@ -20,7 +27,7 @@ MainFrame.Parent = ScreenGui
 MainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 MainFrame.BorderSizePixel = 0
 MainFrame.Position = UDim2.new(0.3, 0, 0.2, 0)
-MainFrame.Size = UDim2.new(0, 280, 0, 300) -- UI menor
+MainFrame.Size = UDim2.new(0, 280, 0, 300)
 
 TopBar.Name = "TopBar"
 TopBar.Parent = MainFrame
@@ -77,7 +84,6 @@ CommandList.Size = UDim2.new(0.9, 0, 0.7, 0)
 CommandList.CanvasSize = UDim2.new(0, 0, 0, 0)
 CommandList.ScrollBarThickness = 6
 CommandList.AutomaticCanvasSize = Enum.AutomaticSize.Y
-CommandList.CanvasSize = UDim2.new(0, 0, 0, 0)
 
 UIListLayout.Parent = CommandList
 UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
@@ -85,23 +91,12 @@ UIListLayout.Padding = UDim.new(0, 5)
 
 -- Lista de comandos
 local commands = {
-    ";ice <player>",
-    ";jail <player>",
-    ";buffify <player>",
-    ";wormify <player>",
-    ";chibify <player>",
-    ";plushify <player>",
-    ";freakify <player>",
-    ";frogify <player>",
-    ";spongify <player>",
-    ";bigify <player>",
-    ";creepify <player>",
-    ";dinofy <player>"
+    ";esp"
 }
 
 local buttons = {}
 
--- Função criar botões
+-- Criação dos botões
 local function CreateButton(name)
     local Button = Instance.new("TextButton")
     Button.Parent = CommandList
@@ -118,7 +113,7 @@ for _, v in pairs(commands) do
     CreateButton(v)
 end
 
--- Botões
+-- Botões Fechar e Minimizar
 CloseButton.MouseButton1Click:Connect(function()
     ScreenGui:Destroy()
 end)
@@ -136,23 +131,16 @@ MinButton.MouseButton1Click:Connect(function()
     end
 end)
 
--- Pesquisa funcional
+-- Pesquisa
 SearchBox:GetPropertyChangedSignal("Text"):Connect(function()
     local text = SearchBox.Text:lower()
     for name, button in pairs(buttons) do
-        if string.find(name:lower(), text) then
-            button.Visible = true
-        else
-            button.Visible = false
-        end
+        button.Visible = string.find(name:lower(), text) ~= nil
     end
 end)
 
--- Sistema de arrastar
-local dragging
-local dragInput
-local dragStart
-local startPos
+-- Arrastar Janela
+local dragging, dragInput, dragStart, startPos
 
 local function update(input)
     local delta = input.Position - dragStart
@@ -165,7 +153,7 @@ local function update(input)
 end
 
 TopBar.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
         dragging = true
         dragStart = input.Position
         startPos = MainFrame.Position
@@ -179,14 +167,80 @@ TopBar.InputBegan:Connect(function(input)
 end)
 
 TopBar.InputChanged:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+    if input.UserInputType == Enum.UserInputType.MouseMovement then
         dragInput = input
     end
 end)
 
-game:GetService("UserInputService").InputChanged:Connect(function(input)
+UserInputService.InputChanged:Connect(function(input)
     if input == dragInput and dragging then
         update(input)
     end
 end)
 
+-- ESP MM2 Highlight
+local espHighlightActive = false
+local espThread = nil
+
+local function getRoleColor(plr)
+    local char = plr.Character
+    local bp = plr:FindFirstChild("Backpack")
+    if (bp and bp:FindFirstChild("Knife")) or (char and char:FindFirstChild("Knife")) then
+        return Color3.new(1, 0, 0) -- Vermelho (Murder)
+    elseif (bp and bp:FindFirstChild("Gun")) or (char and char:FindFirstChild("Gun")) then
+        return Color3.new(0, 0, 1) -- Azul (Sheriff)
+    else
+        return Color3.new(0, 1, 0) -- Verde (Inocente)
+    end
+end
+
+local function setESPHighlight(enable)
+    if espThread then
+        espThread:Disconnect()
+        espThread = nil
+    end
+    if not enable then
+        for _, plr in ipairs(Players:GetPlayers()) do
+            if plr ~= player and plr.Character and plr.Character:FindFirstChild("Highlight") then
+                plr.Character.Highlight:Destroy()
+            end
+        end
+        return
+    end
+    espThread = RunService.RenderStepped:Connect(function()
+        for _, v in ipairs(Players:GetPlayers()) do
+            if v ~= player and v.Character then
+                local highlight = v.Character:FindFirstChild("Highlight")
+                if not highlight then
+                    highlight = Instance.new("Highlight")
+                    highlight.Parent = v.Character
+                    highlight.FillTransparency = 0.5
+                    highlight.OutlineTransparency = 0.5
+                end
+                highlight.FillColor = getRoleColor(v)
+            end
+        end
+    end)
+end
+
+-- Função para executar comandos
+local function ExecuteCommand(cmd)
+    if cmd == ";esp" then
+        espHighlightActive = not espHighlightActive
+        setESPHighlight(espHighlightActive)
+    end
+end
+
+-- Clique dos botões
+for name, button in pairs(buttons) do
+    button.MouseButton1Click:Connect(function()
+        ExecuteCommand(name)
+    end)
+end
+
+-- Comando pelo chat
+player.Chatted:Connect(function(msg)
+    if string.sub(msg, 1, 1) == ";" then
+        ExecuteCommand(msg:lower())
+    end
+end)
